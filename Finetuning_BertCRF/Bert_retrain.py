@@ -36,7 +36,6 @@ if __name__ == "__main__":
     output_dir = s_args.output_dir
     device = s_args.device
     label2idx = s_args.label2idx
-    num_tags = len(label2idx)
     model_list = s_args.model_list
     train_examples = s_args.train_seq_list
     train_examples_labels = s_args.train_seq_label_list
@@ -76,7 +75,7 @@ if __name__ == "__main__":
     bert_model = BertModel.from_pretrained(model_list[model_id])
     # config = BertConfig.from_pretrained(model_list[model_id], output_hidden_states=True)
     # the missing information will be filled by other file and function
-    model = BERT_CRF_NER(bert_model, num_tags, batch_size=batch_size, max_seq_len=max_seq_len, device=device)
+    model = BERT_CRF_NER(bert_model, label2idx, batch_size=batch_size, max_seq_len=max_seq_len, device=device)
 
     # you should choose to start the training from scratch or from the previous
     if load_checkpoint and os.path.exists(output_dir + 'bert_crf_ner.checkpoint.pt'):

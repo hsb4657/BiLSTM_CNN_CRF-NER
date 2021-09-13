@@ -62,7 +62,7 @@ class DataProcessor():
         # filling
         tokens = tokens + ['[SEP]']
         first_label_mask.append(0)
-        input_mask = len(tokens) *[1]
+        input_mask = len(tokens) * [1]
         input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
 
         # padding

@@ -12,13 +12,13 @@ from ..common_modules.CRF_classes import CRF
 
 
 class BERT_CRF_NER(nn.Module):
-    def __init__(self, bert_model, num_label, hidden_size=768, batch_size=64, max_seq_len=512, device='cpu'):
+    def __init__(self, bert_model, label2idx, hidden_size=768, batch_size=64, max_seq_len=512, device='cpu'):
         super(BERT_CRF_NER, self).__init__()
         self.bert_model = bert_model
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         self.max_seq_len = max_seq_len
-        self.num_label = num_label
+        self.num_label = len(label2idx)
         self.device = device
         # create the dropout layer
         self.dropout = nn.Dropout(0.2)
@@ -27,10 +27,10 @@ class BERT_CRF_NER(nn.Module):
         # init the weight and bias of feature-emission layer
         nn.init.xavier_uniform_(self.hid2label.weight)
         nn.init.constant_(self.hid2label.bias, 0.0)
-        self.crf = CRF(num_labels=num_label,
-                       pad_idx=2,
-                       bos_idx=0,
-                       eos_idx=1,
+        self.crf = CRF(num_labels=self.num_label,
+                       pad_idx=label2idx['[X]'],
+                       bos_idx=label2idx['[BOS]'],
+                       eos_idx=label2idx['[EOS]'],
                        device=device)
 
     def init_bert_weight(self, module):
@@ -85,7 +85,7 @@ class BERT_CRF_NER(nn.Module):
             # valid_label_mask = torch.masked_select(first_label_mask[batch_iter],
             #                                        input_mask[batch_iter].unsqueeze(1)).view(-1,feature_dim)[1:-1]
             assert len(valid_token_input) == len(valid_label_mask)
-            assert valid_label_mask[0] == 1
+            assert valid_label_mask[0].item() == 1  # transfer tensor to num
             i_word_vector = 0
             token_iter = 0
             while token_iter < len(valid_label_mask):
@@ -147,3 +147,9 @@ class BERT_CRF_NER(nn.Module):
         token_feature = self.get_bert_features(input_ids, seg_ids, input_mask)
         word2emission = self.word_embedding(token_feature, input_mask, first_label_mask)
         return self.crf.viterbi_decode(word2emission, true_label_mask)
+
+    def get_bert_emission(self, input_ids, input_mask, seg_ids, first_label_mask):
+        token_features = self.get_bert_features(input_ids, seg_ids, input_mask)
+        wv2emission = self.word_embedding(token_features, input_mask, first_label_mask)
+        return wv2emission  # (batch_size, token_sent_len, bert_token_dim)
+
