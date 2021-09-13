@@ -33,11 +33,11 @@ def processing_orgdata(mode):
     sentence_label = []
     str_sent = ''
 
-    data_dir = '../DNRTI-Dataset/'
+    data_dir = 'DNRTI-Dataset/'
     file_list = ['train.txt', 'valid.txt', 'test.txt']
     if mode == 'train':
         file_read = open(os.path.join(data_dir, file_list[0]), 'r')
-    elif mode == 'dev':
+    elif mode == 'valid':
         file_read = open(os.path.join(data_dir, file_list[1]), 'r')
     else:
         file_read = open(os.path.join(data_dir, file_list[2]), 'r')
@@ -83,7 +83,7 @@ def processing_orgdata(mode):
     return sentences, sentences_labels, sentences_pos, str_sentences, sent_maxlen, word_maxlen, num_sentence
 
 
-def build_vocab(sentences, sentences_labels, sentences_pos): # 这里的输入信息都是train+dev+test
+def build_vocab(sentences, sentences_labels, sentences_pos): # 这里的输入信息都是train+valid+test
 
     word_list = []
     char_list = []
@@ -97,14 +97,16 @@ def build_vocab(sentences, sentences_labels, sentences_pos): # 这里的输入�
             for char in sentences[i_sent][j_word]:
                 char_list.append(char)
 
-    word_set = list(set(word_list))
+    # word_set = list(set(word_list))
+    word_counter = Counter(word_list)
+    word_set = [word[0] for word in word_counter.most_common() if word[1] >= 3]  # make sure the number of word>=3
     print("The word set is ", word_set)
     word2index = {each_word: word_index+2 for word_index, each_word in enumerate(word_set)}
     word2index['[PAD]'] = 0; word2index['[UNK]'] = 1
     index2word = {word_index: each_word for each_word, word_index in word2index.items()}
 
     char_counter = Counter(char_list)
-    char_set = [char[0] for char in char_counter.most_common()]
+    char_set = [char[0] for char in char_counter.most_common() if char[1] >= 3]  # make sure the number of char>=3
     print("The char set is ", char_set)
     char2index = {each_char: char_index+2 for char_index, each_char in enumerate(char_set)}
     char2index['[CPAD]'] = 0; char2index['[CUNK]'] = 1
@@ -118,8 +120,9 @@ def build_vocab(sentences, sentences_labels, sentences_pos): # 这里的输入�
     index2label = {label_index: each_label for each_label, label_index in label2index.items()}
 
     pos_set = list(set(pos_list))
-    print('The pos set is ',pos_set)
-    pos2index = {pos:id for id, pos in enumerate(pos_set)}
+    print('The pos set is ', pos_set)
+    pos2index = {pos : id+1 for id, pos in enumerate(pos_set)}
+    pos2index['[PPAD]'] = 0
     index2pos = {id:pos for pos, id in pos2index.items()}
     return word2index, index2word, char2index, index2char, label2index, index2label, pos2index, index2pos
 
@@ -154,7 +157,7 @@ def get_token_case(token, case2idx): # 组成token的字符形态学特征
     return case2idx[casing]
 
 
-def text2ids(sentences, sentences_labels, sentences_pos, word2index, char2index, label2index, pos2index, case2idx):# 这里的输入信息分别是train、dev、test等
+def text2ids(sentences, sentences_labels, sentences_pos, word2index, char2index, label2index, pos2index, case2idx):# 这里的输入信息分别是train、valid、test等
     sents_wordids = []
     sents_charids = []
     sents_labels_ids = []
@@ -176,7 +179,7 @@ def text2ids(sentences, sentences_labels, sentences_pos, word2index, char2index,
                 wordid = word2index['[UNK]'] # 低频率词和未登录词
 
             charid = [] # 一个单词的字符组成
-            for char in word: # 如果不是全部统计train+dev+test，需要分别考虑
+            for char in word: # 如果不是全部统计train+valid+test，需要分别考虑
                 if char not in char2index:
                     # char2index[char] = len(char2index)
                     char2index[char] = char2index['[CUNK]']
@@ -208,7 +211,8 @@ def sentence_padding(sentences, sent_maxlen, padding_value): # 这里，每个�
         else:
             padded.append(sent[:sent_maxlen])
             actual_len.append(sent_maxlen)
-    return np.array(padded), actual_len
+    return padded
+    # return np.array(padded), actual_len
 
 
 def char_sentences_padding(sents_charids, sent_maxlen, word_maxlen): # padding_value是char2index['[CPAD]'] = 0
@@ -232,7 +236,8 @@ def char_sentences_padding(sents_charids, sent_maxlen, word_maxlen): # padding_v
 
         pad_char_sentences.append(sent_char_pad) # 填充后的句子集合
 
-    return np.array(pad_char_sentences) # 返回numpy类型数据
+    return pad_char_sentences
+    # return np.array(pad_char_sentences) # 返回numpy类型数据
 
 
 def build_word_emb_table(index2word, glove_embed_dict, word_embed_dim):
@@ -304,11 +309,15 @@ def get_batch(dataset, batch_size, shuffle=False):
 '''
 
 
-def gen_batch_data(sentences, char_sentences, sentences_labels, sentencens_pos, num_sentence, batch_size):
-    sentences = np.array(sentences)
-    char_sentences = np.array(char_sentences)
-    sentences_labels = np.array(sentences_labels)
-    sentencens_pos = np.array(sentencens_pos)
+def gen_batch_data(sents, labels, bert_sents, bert_labels, num_sentence, batch_size):
+    word_sentences = np.array(sents[0])  # wordids_pad
+    char_sentences = np.array(sents[1])  # charids_pad
+    pos_sentences = np.array(sents[2])
+    case_sentences = np.array(sents[3])
+    labels_sentences = np.array(labels)
+
+    bert_sents = np.array(bert_sents)
+    bert_labels = np.array(bert_labels)
 
     data_idx = np.arange(num_sentence)
     random.shuffle(data_idx)
@@ -317,20 +326,32 @@ def gen_batch_data(sentences, char_sentences, sentences_labels, sentencens_pos, 
     while True:
         if i + batch_size >= num_sentence:
             batch_inx = data_idx[i:]
-            batch_sentences = sentences[batch_inx]
+            batch_word_sentences = word_sentences[batch_inx]
             batch_char_sentences = char_sentences[batch_inx]
-            batch_sentences_labels = sentences_labels[batch_inx]
-            batch_sentencens_pos = sentencens_pos[batch_inx]
-            yield batch_sentences, batch_char_sentences, batch_sentences_labels, batch_sentencens_pos
+            batch_pos_sentencens = pos_sentences[batch_inx]
+            batch_case_sentences = case_sentences[batch_inx]
+            batch_labels_sentences = labels_sentences[batch_inx]
+
+            batch_bert_sents = bert_sents[batch_inx]
+            batch_bert_labels = bert_labels[batch_inx]
+
+            yield (batch_word_sentences, batch_char_sentences, batch_pos_sentencens, batch_case_sentences), \
+                  batch_labels_sentences, batch_bert_sents, batch_bert_labels
             break
         else:
-            batch_inx = data_idx[i: i+ batch_size]
-            batch_sentences = sentences[batch_inx]
+            batch_inx = data_idx[i: i+batch_size]
+            batch_word_sentences = word_sentences[batch_inx]
             batch_char_sentences = char_sentences[batch_inx]
-            batch_sentences_labels = sentences_labels[batch_inx]
-            batch_sentencens_pos = sentencens_pos[batch_inx]
-            yield batch_sentences, batch_char_sentences, batch_sentences_labels, batch_sentencens_pos
-            i = i+ batch_size
+            batch_pos_sentencens = pos_sentences[batch_inx]
+            batch_case_sentences = case_sentences[batch_inx]
+            batch_labels_sentences = labels_sentences[batch_inx]
+
+            batch_bert_sents = bert_sents[batch_inx]
+            batch_bert_labels = bert_labels[batch_inx]
+
+            yield (batch_word_sentences, batch_char_sentences, batch_pos_sentencens, batch_case_sentences), \
+                  batch_labels_sentences, batch_bert_sents, batch_bert_labels
+            i = i + batch_size
 
 
 class DataLoader:

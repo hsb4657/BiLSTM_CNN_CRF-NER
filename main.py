@@ -1,48 +1,73 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# @Time    : 2021/9/1 上午10:52
+# @Time    : 2021/9/11 下午4:28
 # @Author  : PeiP Liu
 # @FileName: main.py
 # @Software: PyCharm
 
+import os
 import torch
+import pickle
 import torch.nn as nn
-from data_utils import *
+import numpy as np
+from tqdm import trange
+import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
+from arguments import BilstmCnnArgs as args
+from arguments import BertArgs as bert_args
+from BiLSTM_CNN.model import build_model
+from data_utils import gen_batch_data
+from Finetuning_BertCRF.BertModel import BERT_CRF_NER
 
-# get the text data from orig_file
-train_dataset = processing_orgdata('train')
-dev_dataset = processing_orgdata('dev')
-test_dataset = processing_orgdata('test')
-# get the max length of sentence(word) and word(char)
-sent_maxlen = max(train_dataset[4], dev_dataset[4], test_dataset[4]) # 这里的最长后续要根据数据的分布情况调整
-word_maxlen = max(train_dataset[5], dev_dataset[5], test_dataset[5]) # 这里的最长后续要根据数据的分布情况调整
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1,2'
 
-# construct the dict of
-build_vocab_sentences = train_dataset[0] + dev_dataset[0] + test_dataset[0]
-build_vocab_sentences_labels = train_dataset[1] + dev_dataset[1] + test_dataset[1]
-build_vocab_sentences_pos = train_dataset[2] + dev_dataset[2] + test_dataset[2]
-# the dict result，后续我们需要增强字符字典的内容
-build_vocab_result = build_vocab(build_vocab_sentences, build_vocab_sentences_labels, build_vocab_sentences_pos)
+if __name__ == "__main__":
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
 
-case2idx, case_emb = case_feature()
-# convert the orig_text to id
-train_text2ids = text2ids(train_dataset[0], train_dataset[1], train_dataset[2], build_vocab_result[0],
-                          build_vocab_result[2], build_vocab_result[4], build_vocab_result[6], case2idx)
+    train_sents = (args.train_wordids_pad, args.train_charids_pad, args.train_posids_pad, args.train_caseids_pad)
+    train_labels = args.train_labelids_pad
 
-# pad the word_id_sentence
-train_word_sentence_padding = sentence_padding(train_text2ids[0], sent_maxlen, build_vocab_result[0]['[PAD]'])
-train_word_sentence_padding = torch.tensor(train_word_sentence_padding, dtype=torch.long)
-# pad the char_id_sentence
-train_char_sentences_padding = char_sentences_padding(train_text2ids[1], sent_maxlen, word_maxlen)
-train_char_sentences_padding = torch.tensor(train_char_sentences_padding, dtype=torch.long)
+    valid_sents = (args.valid_wordids_pad, args.valid_charids_pad, args.valid_posids_pad, args.valid_caseids_pad)
+    valid_labels = args.valid_labelids_pad
 
+    test_sents = (args.test_wordids_pad, args.test_charids_pad, args.test_posids_pad, args.test_caseids_pad)
+    test_labels = args.test_labelids_pad
 
-# get all the feature_tables
-case_emb_table = torch.tensor(case_emb, dtype=torch.float32)
-pos_emb_table = torch.tensor(build_pos_emb_table, dtype=torch.float32)
-char_emb_table = torch.tensor(build_char_emb_table(build_vocab_result[3]), dtype=torch.float32)
+    bert_train_sents = bert_args.train_seq_list
+    bert_train_labels = bert_args.train_seq_label_list
 
-glove = GloveFeature('/home/liupei/2021Paper/Dataset/glove.840B.300d.txt') # 该地址后续可能会变
-glove_embedding_dict = glove.load_glove_embedding()
-word_emb_table = build_word_emb_table(build_vocab_result[1], glove_embedding_dict, glove.glove_dim)
-word_emb_table = torch.tensor(word_emb_table, dtype=torch.float32)
+    bert_valid_sents = bert_args.valid_seq_list
+    bert_valid_labels = bert_args.valid_seq_label_list
+
+    bert_test_sents = bert_args.test_seq_list
+    bert_test_labels = bert_args.test_seq_label_list
+
+    word2indx = args.word2idx
+    label2idx = args.label2idx
+
+    writer = SummaryWriter(log_dir='../Result/LSTM_model', comment='scalar_record')
+    early_stop = EarlyStopping(monitor='acc', min_delta=args.min_delta, patience=args.patience)
+
+    model = build_model('multi_feature_bilstm_atten_crf', args).to(args.device)
+
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html
+    lr_decay = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=args.lr_decay_factor,
+                                                    verbose=True, patience=5, min_lr=args.min_lr)  # 重点关注
+
+    """
+    if all(map(os.path.exists, 'Result/Embedding/word_embedding.npy')):
+        pretrained_embedding = np.load('Result/Embedding/word_embedding.npy')
+        model.init_embedding(pretrained_embedding)
+    """
+
+    for epoch in trange(args.total_train_epoch, desc='Epoch'):
+        model.train()
+        for i_batch, (batch_train_sents, batch_train_labels, batch_bert_train_sents, batch_bert_train_labels) in \
+                enumerate(gen_batch_data(train_sents, train_labels, bert_train_sents, bert_train_labels, args.num_train, args.batch_size)):
+            i_batch_train_sents = torch.from_numpy(batch_train_sents).long().to(args.device)
+            i_batch_train_labels = torch.from_numpy(batch_train_labels).long().to(args.device)
+            i_batch_bert_train_sents = batch_bert_train_sents.tolist()
+            i_batch_bert_train_labels = batch_bert_train_labels.tolist()
