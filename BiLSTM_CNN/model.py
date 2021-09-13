@@ -262,7 +262,7 @@ class TansformerCRF(BaseSetting):
             raise ValueError
 
 
-@register_model('bilstm_self_atten_crf')
+@register_model('bilstm_atten_crf')
 class BilstmAttenCRF(BaseSetting):
     def __init__(self, args):
         super(BilstmAttenCRF, self).__init__(args)
@@ -346,7 +346,7 @@ class BilstmMultiheadAttenCRF(BaseSetting):
             raise ValueError
 
 
-@register_model('bilstm_self_atten_softmax')
+@register_model('bilstm_atten_softmax')
 class BilstmAttenSoft(BaseSetting):
     def __init__(self, args):
         super(BilstmAttenSoft, self).__init__(args)
@@ -361,13 +361,9 @@ class BilstmAttenSoft(BaseSetting):
 
         lstm_output, _ = self.bilstm(mod_feature, self.init_lstm_hidden(word_data.size(0), 2))
 
-        # *******************在此阶段添加外部语义增强信息,并进行ff*******************
-
         attention_output = self.attention(lstm_output, lstm_output, lstm_output, attention_mask)
 
         emission = self.hid2emission(attention_output)
-
-        # *******************在此阶段添加BERT信息，并进行ff*******************
 
         if opt_type is 'train':
             loss = F.cross_entropy(emission.view(-1, self.num_labels), truth_label.view(-1), ignore_index=self.label_pad_indx)
@@ -382,10 +378,42 @@ class BilstmAttenSoft(BaseSetting):
             raise ValueError
 
 
+@register_model('multi_feature_bilstm_atten_crf')
+class MultifeatureBilstmAttenCRF(BaseSetting):
+    def __init__(self, args):
+        super(MultifeatureBilstmAttenCRF, self).__init__(args)
+        self.bilstm = nn.LSTM(self.model_dim, self.hid_dim // 2,
+                              num_layers=self.bilstm_layers, batch_first=True, bidirectional=True)
 
+        self.attention = build_attention(self.attention_type, self.hid_dim, self.hid_dim,
+                                         self.dropout_rate)  # attention_type=general
 
+        self.emission2emission = nn.Linear(2 * self.num_labels, self.num_labels)
 
+    def forward(self, char_data, word_data, pos_data, case_data, truth_label, opt_type, bert_emission):
+        attention_mask, mod_feature, valid_sent_mask = self.partial_forward(char_data, word_data, pos_data, case_data)
 
+        lstm_output, _ = self.bilstm(mod_feature, self.init_lstm_hidden(word_data.size(0), 2))
 
+        # *******************在此阶段添加外部语义增强信息,并进行ff*******************
 
+        attention_output = self.attention(lstm_output, lstm_output, lstm_output, attention_mask)
 
+        emission = self.hid2emission(attention_output)
+
+        bert_emission = bert_emission[:, :word_data.size(-1), :]  # bert_emission的sent_len要实际大于lstm的emission
+        emission = torch.cat([emission, bert_emission], dim=-1)
+
+        emission = self.emission2emission(emission)
+
+        if opt_type is 'train':
+            loss = self.crf(emission, truth_label, valid_sent_mask)
+            return loss
+
+        elif opt_type is "test":
+            final_max_score, best_tagging_path = self.crf.viterbi_decode(emission, valid_sent_mask)
+            return final_max_score, best_tagging_path
+
+        else:
+            print("Please input the correct string, 'train' or 'test'")
+            raise ValueError

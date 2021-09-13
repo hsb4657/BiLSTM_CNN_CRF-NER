@@ -14,11 +14,14 @@ import numpy as np
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import sys
+sys.path.append("..")
+from arguments import BilstmCnnArgs as args
 
-embedding_dim = 20
+embedding_dim = args.pos_embed_dim
 windows_size = 5
-sentences = dataset['train'] + dataset['dev'] + dataset['test'] # 这里是text2ids之后的pos序列的信息,可以选择不填充
-vocab_size = len(pos2index) # 尺寸是pos2index的大小
+sentences = args.all_posids_pad  # all the posids_sentences with padding after text2ids
+vocab_size = len(args.pos2idx)  # the size of pos2index
 
 
 class PosEmbedding(nn.Module):
@@ -76,8 +79,8 @@ def gen_batch(data, batch_size):
 
 
 if __name__ == '__main__':
-    if not os.path.exists('Result/PosEmbedding'):
-        os.makedirs('Result/PosEmbedding')
+    if not os.path.exists('..Result/Embedding'):
+        os.makedirs('..Result/Embedding')
 
     lr = 0.001
     batch_size = 64
@@ -105,10 +108,10 @@ if __name__ == '__main__':
 
             if i % 1000 == 0:
                 print('Epoch: {}, Batch: {}, Loss: {}'.format(epoch, i, loss.item()))
-        np.save(os.path.join('Result/PosEmbedding', 'pos_{:0>2d}.npy'.format(epoch)), model.embedding.weight.detach().cpu().numpy())
-        if os.path.exists(os.path.join('Result/PosEmbedding', 'pos_{:0>2d}.npy'.format(epoch-3))):
-            os.remove(os.path.join('Result/PosEmbedding', 'pos_{:0>2d}.npy'.format(epoch-3)))
+        np.save(os.path.join('..Result/Embedding', 'pos_{:0>2d}.npy'.format(epoch)), model.embedding.weight.detach().cpu().numpy())
+        if os.path.exists(os.path.join('..Result/Embedding', 'pos_{:0>2d}.npy'.format(epoch-3))):
+            os.remove(os.path.join('..Result/Embedding', 'pos_{:0>2d}.npy'.format(epoch-3)))
 
     # 文件中存储的向量即是pos_emb，第一行向量即对应idx2pos[0]
-    np.save('Result/PosEmbedding/pos_embedding.npy', model.embedding.weight.detach().cpu().numpy())
+    np.save('..Result/Embedding/pos_embedding.npy', model.embedding.weight.detach().cpu().numpy())
     print('POS training is Over !')
