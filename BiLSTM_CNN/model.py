@@ -38,13 +38,13 @@ def register_model(name):
 class BaseSetting(nn.Module):
     def __init__(self, args):
         super().__init__()
-        self.word_emb_table = pickle.load(args.word_emb_table_file)
-        self.char_emb_table = pickle.load(args.char_emb_table_file)
-        self.pos_emb_table = pickle.load(args.pos_emb_table_file)
-        self.case_emb_table = pickle.load(args.case_emb_table_file)
+        self.word_emb_table = torch.tensor(args.word_emb_table, dtype=torch.float32)
+        self.char_emb_table = torch.tensor(args.char_emb_table, dtype=torch.float32)
+        self.pos_emb_table = torch.tensor(args.pos_emb_table, dtype=torch.float32)
+        self.case_emb_table = torch.tensor(args.case_emb_table, dtype=torch.float32)
 
-        self.sent_maxlen = args.sent_maxlen
-        self.word_maxlen = args.word_maxlen
+        self.sent_maxlen = args.real_sent_maxlen
+        self.word_maxlen = args.real_word_maxlen
 
         self.word_pad_indx = args.word_pad_indx
 
@@ -168,8 +168,8 @@ class BaseSetting(nn.Module):
 
     def init_lstm_hidden(self, batch_size, num_directs):
         # h_0_shape = c_0_shape = (batch_size, num_layers*num_directs, hidden_size)
-        return (torch.randn(batch_size, self.bilstm_layers*num_directs, self.hid_dim//2),
-               torch.randn(batch_size, self.bilstm_layers*num_directs, self.hid_dim//2))
+        return (torch.randn(batch_size, self.bilstm_layers*num_directs, self.hid_dim//2).to(args.device),
+               torch.randn(batch_size, self.bilstm_layers*num_directs, self.hid_dim//2).to(args.device))
 
 """
 @register_model('transformer_crf')

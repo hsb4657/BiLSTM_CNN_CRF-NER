@@ -96,7 +96,6 @@ if __name__ == '__main__':
     print("Starting the pos_emb training...")
     for epoch in range(1, num_epoch+1):
         for i, (centers, contexts) in enumerate(gen_batch(skip_grams, batch_size)):
-            # 软件、组件、第三方库、漏洞；当前采用的方法，存在ＸＸＸ的问题，我们采用ＸＸＸ方法，可以实现ＸＸＸ效果
             centers = torch.from_numpy(centers).long().to(device)
             contexts = torch.from_numpy(contexts).long().to(device)
 
