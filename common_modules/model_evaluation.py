@@ -8,6 +8,7 @@ import time
 import datetime
 import numpy as np
 import torch
+from sklearn.metrics import f1_score, accuracy_score, recall_score, precision_score
 
 
 def time_format(time_diff):
@@ -82,4 +83,9 @@ def bert_evaluate(eva_model, eva_dataloader, eva_epoch_th, eva_device, eva_datas
     return average_acc, f1
 
 
-# def multi_scale_evaluate():
+def lc_cal_f1(true_tags, pred_tags):
+    return f1_score(true_tags, pred_tags)
+
+
+def lc_cal_acc(true_tags, pred_tags):
+    return accuracy_score(np.array(true_tags), np.array(pred_tags))
