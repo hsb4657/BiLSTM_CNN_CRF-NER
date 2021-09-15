@@ -46,6 +46,8 @@ class BasicArgs:
     idx2pos = dict_dataset['index2pos']
     case2idx = dict_dataset['case2idx']
 
+    num_labels = len(label2idx)
+
 
 class BertArgs(BasicArgs):
     output_dir = 'Result/BERT_model/'
@@ -133,6 +135,6 @@ class BilstmCnnArgs(BasicArgs):
     lr_decay_factor = 0.5
 
     word_pad_indx = 0
-    label_pad_indx = 0
-    label_bos_indx = 1
-    label_eos_indx = 2
+    label_bos_indx = 0
+    label_eos_indx = 1
+    label_pad_indx = 2
