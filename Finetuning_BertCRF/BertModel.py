@@ -32,6 +32,7 @@ class BERT_CRF_NER(nn.Module):
                        bos_idx=label2idx['[BOS]'],
                        eos_idx=label2idx['[EOS]'],
                        device=device)
+        # self.apply(self.init_bert_weight)
 
     def init_bert_weight(self, module):
         # cf https://github.com/Louis-udm/NER-BERT-CRF/blob/master/NER_BERT_CRF.py
@@ -74,7 +75,7 @@ class BERT_CRF_NER(nn.Module):
 
     def word_embedding(self, token_features, input_mask, first_label_mask):
         batch_size, seq_len, feature_dim = token_features.shape
-        wv = torch.zeros(token_features.shape, dtype=torch.float32)
+        wv = torch.zeros(token_features.shape, dtype=torch.float32).to(self.device)
         for batch_iter in range(batch_size):
             # get the valid information except for [CLS] and [SEP]
             valid_token_input = token_features[batch_iter][input_mask[batch_iter].bool()][1:-1]
@@ -109,7 +110,7 @@ class BERT_CRF_NER(nn.Module):
     """
     def word_embedding2(self, token_features, input_mask, word_token_num, true_label_ids, true_label_mask):
         batch_size, seq_len, feature_dim = token_features.shape
-        wv = torch.zeros(token_features.shape, dtype=torch.float32)
+        wv = torch.zeros(token_features.shape, dtype=torch.float32).to(self.device)
         for batch_iter in range(batch_size):
             assert len(word_token_num[batch_iter]) == len(true_label_ids[batch_iter][true_label_mask[batch_iter].bool()])
             # get the valid information except for [CLS] and [SEP]
