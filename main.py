@@ -62,7 +62,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     # rf https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html
     lr_decay = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=args.lr_decay_factor,
-                                                    verbose=True, patience=5, min_lr=args.min_lr)  # 重点关注
+                                                    verbose=True, patience=5, min_lr=args.min_lr)
 
     """
     if all(map(os.path.exists, 'Result/Embedding/word_embedding.npy')):

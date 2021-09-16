@@ -91,7 +91,7 @@ def build_vocab(sentences, sentences_labels, sentences_pos): # 这里的输入�
     pos_list = []
     for i_sent in range(len(sentences)):
         for j_word in range(len(sentences[i_sent])):
-            word_list.append(sentences[i_sent][j_word].lower()) # 字典中单词统一为小写字母, 且保证频次小于5的单词由UNK来替代表示
+            word_list.append(sentences[i_sent][j_word].lower())  # all the wod in dict is lower
             label_list.append(sentences_labels[i_sent][j_word])
             pos_list.append(sentences_pos[i_sent][j_word])
             for char in sentences[i_sent][j_word]:
@@ -165,25 +165,25 @@ def text2ids(sentences, sentences_labels, sentences_pos, word2index, char2index,
     sents_caseids = []
 
     for sent_iter, sent in enumerate(sentences):
-        word_ids = [] # 将每个句子转换成token_id的形式
-        char_ids = [] # 将每个句子中的token转换成char_id的形式
-        label_ids = [] # 将每个句子的标签转换成label_id的形式
-        pos_ids = [] # 将每个句子的token pos转换成pos_id的形式
-        case_ids = [] # 考察每个句子中token的特殊形态特征
+        word_ids = []  # convert the sentence to token_id
+        char_ids = []  # convert the sentence to char_id
+        label_ids = []  # convert the sentence_label to label_id
+        pos_ids = []  # convert the sentence_pos to pos_id
+        case_ids = []  # get the morphology_id
         for word_iter, word in enumerate(sent):
             if word in word2index:
                 wordid = word2index[word]
-            elif word.lower() in word2index: # 词典实际上全是小写字母构造
-                wordid = word2index[word.lower()]
+            elif word.lower() in word2index:
+                wordid = word2index[word.lower()]  # the lower word
             else:
-                wordid = word2index['[UNK]'] # 低频率词和未登录词
+                wordid = word2index['[UNK]']  # the low frequency words and OOV
 
-            charid = [] # 一个单词的字符组成
-            for char in word: # 如果不是全部统计train+valid+test，需要分别考虑
+            charid = []  # the chars of a word
+            for char in word:
                 if char not in char2index:
-                    # char2index[char] = len(char2index)
-                    char2index[char] = char2index['[CUNK]']
-                charid.append(char2index[char])
+                    charid.append(char2index['[CUNK]'])  # the low frequency chars and OOV
+                else:
+                    charid.append(char2index[char])
 
             word_ids.append(wordid)
             char_ids.append(charid)
@@ -219,31 +219,31 @@ def char_sentences_padding(sents_charids, sent_maxlen, word_maxlen): # padding_v
     pad_char_sentences = []
     for sent in sents_charids:
         sent_char_pad = np.zeros([sent_maxlen, word_maxlen], dtype = np.int32) # 表示一个句子
-        sc_pad = [] # 表示一个句子
-        for word in sent: # 这里是已经转换成char_id的word2char列表
-            char_pad = np.zeros([word_maxlen], dtype=np.int32) # 表示一个单词
+        sc_pad = []  # one sequence
+        for word in sent:  # a sequence of char_id from char2indx
+            char_pad = np.zeros([word_maxlen], dtype=np.int32)  # on word
             if len(word) <= word_maxlen:
                 char_pad[:len(word)] = word
             else:
                 char_pad = word[:word_maxlen]
             # char_pad = word[:word_maxlen] + [padding_value] * max(word_maxlen - len(word), 0)
 
-            sc_pad.append(char_pad) # 这是一个句子中所有单词的列表
-        # 填充不够长的句子
-        for i in range(len(sc_pad)):
-            sent_char_pad[i, :len(sc_pad[i])] = sc_pad[i] # post填充
-            # sent_char_pad[sent_maxlen-len(sc_pad)+i, :len(sc_pad[i])] = sc_pad[i] # trunte填充
+            sc_pad.append(char_pad)  # a list of char_id for a sentence
 
-        pad_char_sentences.append(sent_char_pad) # 填充后的句子集合
+        for i in range(len(sc_pad)):
+            sent_char_pad[i, :len(sc_pad[i])] = sc_pad[i]  # post padding
+            # sent_char_pad[sent_maxlen-len(sc_pad)+i, :len(sc_pad[i])] = sc_pad[i] # trunte padding
+
+        pad_char_sentences.append(sent_char_pad)  # the list of padded sentences
 
     return pad_char_sentences
-    # return np.array(pad_char_sentences) # 返回numpy类型数据
+    # return np.array(pad_char_sentences)  # numpy array
 
 
 def build_word_emb_table(index2word, glove_embed_dict, word_embed_dim):
     scale = np.sqrt(3.0 / word_embed_dim)
-    word_emb_table = np.empty([len(index2word), word_embed_dim], dtype = np.float32)
-    word_emb_table[:2,:] = np.random.uniform(-scale, scale, [2, word_embed_dim]) # 表示UNK和PAD
+    word_emb_table = np.empty([len(index2word), word_embed_dim], dtype=np.float32)
+    word_emb_table[:2, :] = np.random.uniform(-scale, scale, [2, word_embed_dim])  # UNK and PAD
     for index, word in index2word.items():
         if word in glove_embed_dict:
             word_emb = glove_embed_dict[word]
@@ -251,7 +251,7 @@ def build_word_emb_table(index2word, glove_embed_dict, word_embed_dim):
             word_emb = glove_embed_dict[word.lower()]
         else:
             word_emb = np.random.uniform(-scale, scale, [1, word_embed_dim])
-        word_emb_table[index,:] = word_emb
+        word_emb_table[index, :] = word_emb
     return word_emb_table
 
 
