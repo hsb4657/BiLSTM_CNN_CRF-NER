@@ -75,6 +75,8 @@ class BaseSetting(nn.Module):
         self.mod2emission = nn.Linear(self.model_dim, self.num_labels)
         self.hid2emission = nn.Linear(self.hid_dim, self.num_labels)
 
+        self.cnn_model = CNN(self.char_embed.size(-1), self.word_maxlen)
+
         self.crf = CRF(
             num_labels=self.num_labels,
             pad_idx=self.label_pad_indx,
@@ -121,9 +123,7 @@ class BaseSetting(nn.Module):
         conv_result = conv(char_data_emb) # (batch*sent_len, out_char_dim, 1, word_len-file_size+1)
         conv_result = conv_result.view(batch*sent_len, out_char_dim, word_len-file_size+1)
         """
-
-        cnn_model = CNN(self.char_embed.size(-1), self.word_maxlen).cuda()
-        cnn_feature = cnn_model(char_data_emb)  # the input size should be (batch_size, in_char_dim, sent_len, word_len)
+        cnn_feature = self.cnn_model(char_data_emb)  # the input size should be (batch_size, in_char_dim, sent_len, word_len)
         return cnn_feature  # the size is (batch_size, sent_len, out_char_dim)
 
     """
