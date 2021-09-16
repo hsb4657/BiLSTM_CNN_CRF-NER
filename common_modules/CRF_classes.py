@@ -24,7 +24,7 @@ class CRF(nn.Module):
         self.bos_idx = bos_idx
         self.eos_idx = eos_idx
         self.device = device
-        self.transitions = nn.Parameter(torch.randn(self.num_labels, self.num_labels))
+        self.transitions = nn.Parameter(torch.randn(self.num_labels, self.num_labels), requires_grad=True)
         # nn.init.uniform_(self.transitions, -0.1, 0.1)
         # some impossible transfer with exp(-10000)
         self.transitions.data[:, self.bos_idx] = -10000

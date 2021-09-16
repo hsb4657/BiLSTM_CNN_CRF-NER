@@ -42,14 +42,15 @@ class EarlyStopping:
         if self._best is None:
             self._best = current
             self._best_epoch = epoch
-            return
+            return  # the first return empty
         if self.monitor_op(current-self.min_delta, self._best):
             self._best = current
             self._best_epoch = epoch
             self._wait = 0
+            return
         else:
             self._wait = self._wait + 1
-            if self._wait >= self.patience:
+            if self._wait >= self.patience:  # when the f1_score decay in patience consecutive epoch, we stop the train
                 return True
 
     @property
